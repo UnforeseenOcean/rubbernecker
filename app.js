@@ -1,19 +1,59 @@
 var vid = document.getElementById('videoel');
 var webGLCanvas = document.getElementById('webgl');
 var imgCanvasEl = document.getElementById('img-canvas');
+var newcanvas = document.getElementById('output');
 var imageCtx = imgCanvasEl.getContext("2d");
 
 var imageObj = new Image();
 var imageIndex = 0;
 var mapping, ctrackBG, positions, animationRequest;
 
+var ctrack = new clm.tracker({useWebGL : true});
+ctrack.setResponseMode("cycle", ["lbp", "sobel"]);
+ctrack.init(pModel);
+
+imageObj.onload = function() {
+  newcanvas.getContext('2d').clearRect(0, 0, newcanvas.width, newcanvas.height);
+  videocanvas.getContext('2d').clearRect(0, 0, videocanvas.width, videocanvas.height);
+  imageCtx.clearRect(0, 0, imgCanvasEl.width, imgCanvasEl.height);
+  imageCtx.drawImage(imageObj, 0, 0);
+  var new_positions = ctrack.getCurrentPosition(vid);
+  if (!new_positions && positions) new_positions = positions;
+  if (new_positions) {
+    positions = new_positions;
+    switchMasks(new_positions);
+  }
+};
+
+var fd = new faceDeformer();
+fd.init(document.getElementById('webgl'));
+var wc1 = document.getElementById('webgl').getContext('webgl')
+wc1.clearColor(0,0,0,0);
+
+var fd2 = new faceDeformer();
+fd2.init(document.getElementById('webgl2'));
+var wc2 = document.getElementById('webgl2').getContext('webgl')
+wc2.clearColor(0,0,0,0);
+
+// canvas for copying the warped face to
+//var newcanvas = document.createElement('CANVAS');
+//newcanvas.width = imgCanvasEl.width;
+//newcanvas.height = imgCanvasEl.height;
+//document.body.appendChild(newcanvas);
+
+// canvas for copying videoframes to
+var videocanvas = document.createElement('CANVAS');
+videocanvas.width = imgCanvasEl.width;
+videocanvas.height = imgCanvasEl.height;
+
+// canvas for masking
+var maskcanvas = document.createElement('CANVAS');
+maskcanvas.width = imgCanvasEl.width;
+maskcanvas.height = imgCanvasEl.height;
+
 function switchImage(index) {
   imageObj.src = images[index].name;
   mapping = images[index].coords;
-  var positions = ctrack.getCurrentPosition(vid);
-  if (positions) {
-    switchMasks(positions);
-  }
 }
 
 function nextImage() {
@@ -24,6 +64,7 @@ function nextImage() {
 
 
 function startVideo() {
+  switchImage(0);
   // start video
   vid.play();
   // start tracking
@@ -33,7 +74,6 @@ function startVideo() {
 }
 
 function switchMasks(pos) {
-  console.log('switching masks');
   videocanvas.getContext('2d').drawImage(imgCanvasEl,0,0,videocanvas.width,videocanvas.height);
 
   // we need to extend the positions with new estimated points in order to get pixels immediately outside mask
@@ -79,8 +119,9 @@ function switchMasks(pos) {
     newcanvas.getContext('2d').putImageData(result, 0, 0);
 
     // get mask
-    fd.load(newcanvas, pos, pModel);
-    requestAnimationFrame(drawMaskLoop);
+    //fd.load(newcanvas, pos, pModel);
+    //fd.draw(mapping);
+    //requestAnimationFrame(drawMaskLoop);
   });
 }
 
@@ -89,8 +130,11 @@ function drawMaskLoop() {
   positions = ctrack.getCurrentPosition();
   if (positions) {
     // draw mask on top of face
+    //fd2.load(newcanvas, positions, pModel);
+    //fd2.draw(mapping);
+
     //fd.load(newcanvas, positions, pModel);
-    fd.draw(mapping);
+    //fd.draw(mapping);
   }
   animationRequest = requestAnimationFrame(drawMaskLoop);
 }
@@ -118,7 +162,6 @@ function drawLoop() {
   }
 }
 
-
 function createMasking(canvas, modelpoints) {
   // fill canvas with black
   var cc = canvas.getContext('2d');
@@ -136,7 +179,7 @@ function createMasking(canvas, modelpoints) {
 }
 
 
-navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia; 
+navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
 
 if (navigator.getUserMedia) {
   navigator.getUserMedia({audio: false, video: true}, function(stream) {
@@ -150,41 +193,12 @@ if (navigator.getUserMedia) {
   console.log("Couldn't load webcam");
 }
 
-var ctrack = new clm.tracker({useWebGL : true});
-ctrack.setResponseMode("cycle", ["lbp", "sobel"]);
-ctrack.init(pModel);
+var i = setInterval(function(){
+  nextImage();
+}, 3000);
 
-imageObj.onload = function() {
-  imageCtx.clearRect(0, 0, imgCanvasEl.width, imgCanvasEl.height);
-  imageCtx.drawImage(imageObj, 0, 0);
-};
-switchImage(0);
-
-var fd = new faceDeformer();
-fd.init(document.getElementById('webgl'));
-var wc1 = document.getElementById('webgl').getContext('webgl')
-wc1.clearColor(0,0,0,0);
-
-var fd2 = new faceDeformer();
-fd2.init(document.getElementById('webgl2'));
-var wc2 = document.getElementById('webgl2').getContext('webgl')
-wc2.clearColor(0,0,0,0);
-
-// canvas for copying the warped face to
-var newcanvas = document.createElement('CANVAS');
-newcanvas.width = imgCanvasEl.width;
-newcanvas.height = imgCanvasEl.height;
-document.body.appendChild(newcanvas);
-
-// canvas for copying videoframes to
-var videocanvas = document.createElement('CANVAS');
-videocanvas.width = imgCanvasEl.width;
-videocanvas.height = imgCanvasEl.height;
-document.body.appendChild(videocanvas);
-
-// canvas for masking
-var maskcanvas = document.createElement('CANVAS');
-maskcanvas.width = imgCanvasEl.width;
-maskcanvas.height = imgCanvasEl.height;
-document.body.appendChild(maskcanvas);
-
+//var j = setInterval(function(){
+  //if (positions) {
+    //switchMasks(positions);
+  //}
+//}, 500);

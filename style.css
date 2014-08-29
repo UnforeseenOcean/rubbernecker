@@ -2,10 +2,11 @@ body {
   background: #000;
 }
 
-#overlay, #videoel, #webgl, #img-canvas {
+#overlay, #videoel, #webgl, #webgl2, #img-canvas {
   position: absolute;
   left: 0;
   top: 0;
+  display: none;
 }
 
 #videoel {
