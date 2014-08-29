@@ -1,0 +1,29 @@
+body {
+  background: #000;
+}
+
+#overlay, #videoel, #webgl, #img-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+#videoel {
+  z-index: 0;
+  display: none;
+}
+
+#overlay {
+  z-index: 1;
+}
+
+#webgl {
+  z-index: 1;
+}
+
+#bg-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1280px;
+}
