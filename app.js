@@ -9,7 +9,7 @@ var imageIndex = 0, ready = false;
 var mapping, ctrackBG, positions, animationRequest;
 
 var ctrack = new clm.tracker({useWebGL : true});
-ctrack.setResponseMode("cycle", ["lbp", "sobel"]);
+//ctrack.setResponseMode("cycle", ["lbp", "sobel"]);
 ctrack.init(pModel);
 
 imageObj.onload = function() {
@@ -28,15 +28,12 @@ imageObj.onload = function() {
   var x = $(window).width()/2 - coords[0] * 2;
   var y = $(window).height()/2 - coords[1] * 2;
 
-  console.log(coords[0], coords[1], x, y);
   $('#container').
     addClass('notransition').
     css('-webkit-transform', 'none')[0].offsetHeight
   $('#container').
     removeClass('notransition').
     css({opacity: 1, '-webkit-transform': 'translateX('+x+'px) translateY('+y+'px) scale(2)'});
-  console.log(coords);
-  console.log(images[imageIndex].name);
 };
 
 var fd = new faceDeformer();
@@ -172,7 +169,7 @@ function drawLoop() {
   requestAnimationFrame(drawLoop);
   var positions = ctrack.getCurrentPosition();
 
-  if (ready === true && positions && mapping && ctrack.getScore() > .1) {
+  if (ready === true && positions && mapping && ctrack.getScore() > .5) {
     fd.load(vid, positions, pModel);
     fd.draw(mapping);
   }
@@ -213,7 +210,7 @@ var i = setInterval(function(){
   $('#container').css('opacity', 0);
   setTimeout(function(){
     nextImage();
-  }, 1000)
+  }, 3000)
   //$('#container').fadeOut(function(){
     //nextImage();
   //});
