@@ -4,6 +4,7 @@
   <meta http-equiv="content-type" content="text/html; charset=utf-8" />
   <title>Rubbernecker</title>
   <link href="style.css" rel="stylesheet" />
+  <script src="jquery.min.js"></script>
   <script src="tracker/clmtrackr.js"></script>
   <script src="tracker/js/face_deformer.js"></script>
   <script src="tracker/models/model_pca_20_svm.js"></script>
@@ -12,6 +13,7 @@
 </head>
 
 <body>
+<div id="container">
   <!--<img src="kent-state.jpg">-->
   <!--<img src="ferguson-1.jpg" id="bg-img">-->
   <video id="videoel" width="533" height="300" preload="auto"></video>
@@ -21,5 +23,6 @@
   <canvas id="img-canvas" width="1280" height="720"></canvas>
   <canvas id="output" width="1280" height="720"></canvas>
   <script src="app.js"></script>
+</div>
 </body>
 </html>

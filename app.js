@@ -5,7 +5,7 @@ var newcanvas = document.getElementById('output');
 var imageCtx = imgCanvasEl.getContext("2d");
 
 var imageObj = new Image();
-var imageIndex = 0;
+var imageIndex = 0, ready = false;
 var mapping, ctrackBG, positions, animationRequest;
 
 var ctrack = new clm.tracker({useWebGL : true});
@@ -17,12 +17,26 @@ imageObj.onload = function() {
   videocanvas.getContext('2d').clearRect(0, 0, videocanvas.width, videocanvas.height);
   imageCtx.clearRect(0, 0, imgCanvasEl.width, imgCanvasEl.height);
   imageCtx.drawImage(imageObj, 0, 0);
+  ready = true;
   var new_positions = ctrack.getCurrentPosition(vid);
   if (!new_positions && positions) new_positions = positions;
   if (new_positions) {
     positions = new_positions;
-    switchMasks(new_positions);
+    //switchMasks(new_positions);
   }
+  var coords = images[imageIndex].coords[0];
+  var x = $(window).width()/2 - coords[0] * 2;
+  var y = $(window).height()/2 - coords[1] * 2;
+
+  console.log(coords[0], coords[1], x, y);
+  $('#container').
+    addClass('notransition').
+    css('-webkit-transform', 'none')[0].offsetHeight
+  $('#container').
+    removeClass('notransition').
+    css({opacity: 1, '-webkit-transform': 'translateX('+x+'px) translateY('+y+'px) scale(2)'});
+  console.log(coords);
+  console.log(images[imageIndex].name);
 };
 
 var fd = new faceDeformer();
@@ -52,6 +66,7 @@ maskcanvas.width = imgCanvasEl.width;
 maskcanvas.height = imgCanvasEl.height;
 
 function switchImage(index) {
+  ready = false;
   imageObj.src = images[index].name;
   mapping = images[index].coords;
 }
@@ -70,7 +85,8 @@ function startVideo() {
   // start tracking
   ctrack.start(vid);
   // start loop to draw face
-  drawGridLoop();
+  //drawGridLoop();
+  drawLoop();
 }
 
 function switchMasks(pos) {
@@ -156,7 +172,7 @@ function drawLoop() {
   requestAnimationFrame(drawLoop);
   var positions = ctrack.getCurrentPosition();
 
-  if (positions && mapping && ctrack.getScore() > .5) {
+  if (ready === true && positions && mapping && ctrack.getScore() > .1) {
     fd.load(vid, positions, pModel);
     fd.draw(mapping);
   }
@@ -194,8 +210,14 @@ if (navigator.getUserMedia) {
 }
 
 var i = setInterval(function(){
-  nextImage();
-}, 3000);
+  $('#container').css('opacity', 0);
+  setTimeout(function(){
+    nextImage();
+  }, 1000)
+  //$('#container').fadeOut(function(){
+    //nextImage();
+  //});
+}, 16000);
 
 //var j = setInterval(function(){
   //if (positions) {
