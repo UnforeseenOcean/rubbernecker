@@ -67,7 +67,7 @@ maskcanvas.height = imgCanvasEl.height;
 
 function switchImage(index) {
   ready = false;
-  imageObj.src = images[index].name;
+  imageObj.src = 'images/' + images[index].name;
   mapping = images[index].coords;
 }
 
