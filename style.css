@@ -3,17 +3,11 @@ body {
   overflow: hidden;
 }
 
-#overlay, #videoel, #webgl, #webgl2, #img-canvas {
+#videoel, #webgl, #img-canvas, #buffer, #output {
   position: absolute;
   left: 0;
   top: 0;
   display: none;
-}
-
-#output {
-  position: absolute;
-  left: 0;
-  top: 0;
 }
 
 #img-canvas, #webgl {
@@ -33,10 +27,6 @@ body {
   display: none;
 }
 
-#overlay {
-  z-index: 1;
-}
-
 #webgl {
   z-index: 1;
   opacity: .9;
@@ -54,4 +44,33 @@ body {
   top: 0;
   left: 0;
   -webkit-transition: -webkit-transform 50.5s, opacity 4s ease;
+}
+
+h1 {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background-color: #000;
+  color: #fff;
+  z-index: 999;
+}
+
+#sign {
+  font-size: 100px;
+  font-weight: bold;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 999;
+}
+
+#sign span {
+  transition: 0.2s all;
+  /* -webkit-text-stroke-width: 2px; */
+  display: inline-block;
+  width: 80px;
+}
+
+span.space {
+  border: 1px solid transparent;
 }

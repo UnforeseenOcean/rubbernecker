@@ -1,42 +1,102 @@
+var signText = "COME CLOSER RUBBERNECKER";
+// var fonts = ["Arial", "monospace", "Impact", "Verdana", "Trebuchet MS"];
+var fonts = ["Arial", "Verdana", "Trebuchet MS"];
+var colors = ["#fe0687", "#a210fc", "#05e2fe", "#05e2fe", "#ff6403"];
+var animateSignID;
+
 var vid = document.getElementById('videoel');
 var webGLCanvas = document.getElementById('webgl');
 var imgCanvasEl = document.getElementById('img-canvas');
-var newcanvas = document.getElementById('output');
 var imageCtx = imgCanvasEl.getContext("2d");
 
+var buffer = document.getElementById('buffer');
+var ouput = document.getElementById('output');
+var bx = buffer.getContext('2d');
+var ox = output.getContext('2d');
+
+var faceCanvas = document.createElement('canvas');
+faceCanvas.width = vid.width;
+faceCanvas.height = vid.height;
+
 var imageObj = new Image();
-var imageIndex = 0, ready = false;
+var imageIndex = 0, ready = false, wasDrawing = false, shouldDraw = false, local=true;
 var mapping, ctrackBG, positions, animationRequest;
 
 var ctrack = new clm.tracker({useWebGL : true});
-ctrack.setResponseMode("cycle", ["lbp", "sobel"]);
+//ctrack.setResponseMode("cycle", ["lbp", "sobel"]);
 ctrack.init(pModel);
+var rgb;
+
+var autoplay = true;
+var debug = false;
+
+if (!debug) {
+  shuffle(images);
+}
 
 imageObj.onload = function() {
-  newcanvas.getContext('2d').clearRect(0, 0, newcanvas.width, newcanvas.height);
-  videocanvas.getContext('2d').clearRect(0, 0, videocanvas.width, videocanvas.height);
   imageCtx.clearRect(0, 0, imgCanvasEl.width, imgCanvasEl.height);
-  imageCtx.drawImage(imageObj, 0, 0);
-  ready = true;
-  var new_positions = ctrack.getCurrentPosition(vid);
-  if (!new_positions && positions) new_positions = positions;
-  if (new_positions) {
-    positions = new_positions;
-    //switchMasks(new_positions);
+  var w = imageObj.width;
+  var h = imageObj.height;
+  if (w > 2000) {
+    w = 2000;
+    var ratio = w / imageObj.width;
+    h = imageObj.height * ratio;
+
+    //redo mapping
+    for (var i = 0; i < mapping.length; i ++){
+      mapping[i][0] = mapping[i][0] * ratio;
+      mapping[i][1] = mapping[i][1] * ratio;
+    }
   }
-  var coords = images[imageIndex].coords[0];
+  imgCanvasEl.width = w;
+  imgCanvasEl.height = h;
+
+  if (images[imageIndex].bw == true) {
+    $('#container').css('-webkit-filter', 'grayscale(1)');
+  } else {
+    $('#container').css('-webkit-filter', 'none');
+  }
+
+  imageCtx.drawImage(imageObj, 0, 0, w, h);
+  ready = true;
+
+  // var coords = images[imageIndex].coords[0];
+  var coords = mapping[0];
   var x = $(window).width()/2 - coords[0] * 2;
   var y = $(window).height()/2 - coords[1] * 2;
 
-  console.log(coords[0], coords[1], x, y);
+  if (debug) {
+    $('h1').text(imageIndex + ': ' + images[imageIndex].name);
+  }
+
+
+  if (positions) {
+    var newSaturation = '100%';
+
+    var box = boundingBox(mapping);
+    var imageStats = getImageStats(box.x, box.y, box.w, box.h, imgCanvasEl);
+
+    faceCanvas.getContext('2d').drawImage(vid, 0, 0, vid.width, vid.height);
+    box = boundingBox(positions);
+    var videoStats = getImageStats(box.x, box.y, box.w, box.h, faceCanvas);
+
+    if (imageStats.range > 0 && imageStats.range < videoStats.range) {
+      newSaturation = (100 * imageStats.range / videoStats.range) + '%';
+    }
+
+    $('#webgl').css('-webkit-filter', 'saturate('+newSaturation+') brightness('+(100 * imageStats.brightness/videoStats.brightness)+'%)');
+  } else {
+    $('#webgl').css('-webkit-filter', 'none');
+  }
+
+  if (!autoplay) return true;
   $('#container').
     addClass('notransition').
     css('-webkit-transform', 'none')[0].offsetHeight
   $('#container').
     removeClass('notransition').
     css({opacity: 1, '-webkit-transform': 'translateX('+x+'px) translateY('+y+'px) scale(2)'});
-  console.log(coords);
-  console.log(images[imageIndex].name);
 };
 
 var fd = new faceDeformer();
@@ -44,30 +104,9 @@ fd.init(document.getElementById('webgl'));
 var wc1 = document.getElementById('webgl').getContext('webgl')
 wc1.clearColor(0,0,0,0);
 
-var fd2 = new faceDeformer();
-fd2.init(document.getElementById('webgl2'));
-var wc2 = document.getElementById('webgl2').getContext('webgl')
-wc2.clearColor(0,0,0,0);
-
-// canvas for copying the warped face to
-//var newcanvas = document.createElement('CANVAS');
-//newcanvas.width = imgCanvasEl.width;
-//newcanvas.height = imgCanvasEl.height;
-//document.body.appendChild(newcanvas);
-
-// canvas for copying videoframes to
-var videocanvas = document.createElement('CANVAS');
-videocanvas.width = imgCanvasEl.width;
-videocanvas.height = imgCanvasEl.height;
-
-// canvas for masking
-var maskcanvas = document.createElement('CANVAS');
-maskcanvas.width = imgCanvasEl.width;
-maskcanvas.height = imgCanvasEl.height;
-
 function switchImage(index) {
   ready = false;
-  imageObj.src = images[index].name;
+  imageObj.src = (local ? 'new_image/' : 'http://rubbernecker.s3.amazonaws.com/') + images[index].name;
   mapping = images[index].coords;
 }
 
@@ -89,109 +128,149 @@ function startVideo() {
   drawLoop();
 }
 
-function switchMasks(pos) {
-  videocanvas.getContext('2d').drawImage(imgCanvasEl,0,0,videocanvas.width,videocanvas.height);
-
-  // we need to extend the positions with new estimated points in order to get pixels immediately outside mask
-  //var newMaskPos = mapping.slice(0);//masks[images[currentMask]].slice(0);
-  //var newFacePos = pos.slice(0);
-  var newMaskPos = pos.slice(0);
-  var newFacePos = mapping.slice(0);
-  var extInd = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,22,21,20,19];
-  var newp;
-  for (var i = 0;i < 23;i++) {
-    newp = [];
-    newp[0] = (newMaskPos[extInd[i]][0]*1.3) - (newMaskPos[62][0]*0.3);// short for ((newMaskPos[extInd[i]][0]-newMaskPos[62][0])*1.1)+newMaskPos[62][0]
-    newp[1] = (newMaskPos[extInd[i]][1]*1.3) - (newMaskPos[62][1]*0.3);
-    newMaskPos.push(newp);
-    newp = [];
-    newp[0] = (newFacePos[extInd[i]][0]*1.3) - (newFacePos[62][0]*0.3);
-    newp[1] = (newFacePos[extInd[i]][1]*1.3) - (newFacePos[62][1]*0.3);
-    newFacePos.push(newp);
-  }
-
-  // also need to make new vertices incorporating area outside mask
-  var newVertices = pModel.path.vertices.concat(extended_vertices);
-
-  // deform the mask we want to use to face form
-  fd2.load(vid, newMaskPos, pModel, newVertices);
-  fd2.draw(newFacePos);
-
-  // and copy onto new canvas
-  newcanvas.getContext('2d').drawImage(document.getElementById('webgl2'),0,0);
-
-  // create masking
-  var tempcoords = mapping.slice(0,18);
-  tempcoords.push(mapping[21]);
-  tempcoords.push(mapping[20]);
-  tempcoords.push(mapping[19]);
-  createMasking(maskcanvas, tempcoords);
-
-  // do poisson blending
-  Poisson.load(newcanvas, videocanvas, maskcanvas, function() {
-    var result = Poisson.blend(30, 0, 0);
-
-    // render to canvas
-    newcanvas.getContext('2d').putImageData(result, 0, 0);
-
-    // get mask
-    //fd.load(newcanvas, pos, pModel);
-    //fd.draw(mapping);
-    //requestAnimationFrame(drawMaskLoop);
-  });
-}
-
-function drawMaskLoop() {
-  // get position of face
-  positions = ctrack.getCurrentPosition();
-  if (positions) {
-    // draw mask on top of face
-    //fd2.load(newcanvas, positions, pModel);
-    //fd2.draw(mapping);
-
-    //fd.load(newcanvas, positions, pModel);
-    //fd.draw(mapping);
-  }
-  animationRequest = requestAnimationFrame(drawMaskLoop);
-}
-
-function drawGridLoop() {
-  // get position of face
-  positions = ctrack.getCurrentPosition(vid);
-
-  // check whether mask has converged
-  var pn = ctrack.getConvergence();
-  if (pn < 0.4) {
-    switchMasks(positions);
-  } else {
-    requestAnimationFrame(drawGridLoop);
-  }
+function sendVidToCanvas() {
+  ox.drawImage(vid, 0, 0, vid.width, vid.height);
+  //if (rgb) {
+    //tintVideo(rgb.r, rgb.g, rgb.b);
+  //}
+  setInterval(sendVidToCanvas, 30);
 }
 
 function drawLoop() {
   requestAnimationFrame(drawLoop);
-  var positions = ctrack.getCurrentPosition();
+  positions = ctrack.getCurrentPosition();
 
-  if (ready === true && positions && mapping && ctrack.getScore() > .1) {
+  wasDrawing = shouldDraw;
+  shouldDraw = (ready === true && positions && mapping && ctrack.getScore() > .6);
+
+  if (wasDrawing && !shouldDraw) {
+    $('#webgl').hide();
+    showSign();
+  }
+
+  if (!wasDrawing && shouldDraw) {
+    $('#webgl').show();
+    hideSign();
+  }
+
+  if (shouldDraw) {
     fd.load(vid, positions, pModel);
     fd.draw(mapping);
   }
+
+  if (debug && positions) {
+    output.getContext('2d').clearRect(0, 0, output.width, output.height);
+    ctrack.draw(output)
+  }
 }
 
-function createMasking(canvas, modelpoints) {
-  // fill canvas with black
-  var cc = canvas.getContext('2d');
-  cc.fillStyle="#000000";
-  cc.fillRect(0,0,canvas.width, canvas.height);
-  cc.beginPath();
-  cc.moveTo(modelpoints[0][0], modelpoints[0][1]);
-  for (var i = 1;i < modelpoints.length;i++) {
-    cc.lineTo(modelpoints[i][0], modelpoints[i][1]);
+function getImageStats(startx, starty, w, h, c) {
+  var ctx = c.getContext("2d");
+
+  var imageData = ctx.getImageData(startx, starty, w, h);
+  var data = imageData.data;
+  var r, g, b, avg, count=0, colorSum=0, rgb = {r: 0, g: 0, b: 0};
+
+  for(var x = 0, len = data.length; x < len; x+=4) {
+    ++ count;
+    r = data[x];
+    g = data[x+1];
+    b = data[x+2];
+
+    rgb.r += r;
+    rgb.g += g;
+    rgb.b += b;
+
+    avg = Math.floor((r+g+b)/3);
+    colorSum += avg;
   }
-  cc.lineTo(modelpoints[0][0], modelpoints[0][1]);
-  cc.closePath();
-  cc.fillStyle="#ffffff";
-  cc.fill();
+
+  rgb.r = ~~(rgb.r/count);
+  rgb.g = ~~(rgb.g/count);
+  rgb.b = ~~(rgb.b/count);
+
+  rgb.brightness = Math.floor(colorSum / (w*h));
+  rgb.range = Math.max(rgb.r, rgb.g, rgb.b) - Math.min(rgb.r, rgb.g, rgb.b)
+
+  return rgb;
+}
+
+function tintVideo(r, g, b) {
+  // fill offscreen buffer with the tint color
+  bx.fillStyle = 'rgb(' + r + ', ' + g + ', ' + b + ')';
+  bx.fillRect(0, 0, buffer.width, buffer.height);
+
+  // destination atop makes a result with an alpha channel identical to fg, but with all pixels retaining their original color *as far as I can tell*
+  bx.globalCompositeOperation = "destination-atop";
+  bx.drawImage(vid, 0, 0);
+
+  // to tint the image, draw it first
+  ox.drawImage(vid, 0, 0);
+
+  //then set the global alpha to the amound that you want to tint it, and draw the buffer directly on top of it.
+  ox.globalAlpha = 0.2;
+  ox.drawImage(buffer,0,0);
+}
+
+function animateSign(){
+  $('#sign span').each(function(index){
+    $(this).css({
+      color: randomElement(colors),
+      fontFamily: randomElement(fonts),
+      textShadow: '0 0 30px ' + randomElement(colors),
+      // 'text-stroke': '1px #000'// + randomElement(colors)
+    });
+  });
+}
+
+function showSign() {
+  $('#sign').show();
+  animateSignID = setInterval(animateSign, 300);
+}
+
+function hideSign() {
+  $('#sign').hide();
+  clearInterval(animateSignID);
+}
+
+function randomElement(a) {
+ return a[Math.floor(Math.random() * a.length)];
+}
+
+function boundingBox(coordinates) {
+  var w = 0, h = 0, x = 0, y = 0, x2 = 10000, y2 = 100000;
+
+  for (var i = 0; i < coordinates.length; i ++){
+    if (coordinates[i][0] > x) x = coordinates[i][0];
+    if (coordinates[i][1] > y) y = coordinates[i][1];
+    if (coordinates[i][0] < x2) x2 = coordinates[i][0];
+    if (coordinates[i][1] < y2) y2 = coordinates[i][1];
+  }
+
+  w = x2 - x;
+  h = y2 - y;
+
+  return {w: w, h: h, x: x, y: y}
+
+}
+
+function shuffle(array) {
+  var currentIndex = array.length, temporaryValue, randomIndex ;
+
+  // While there remain elements to shuffle...
+  while (0 !== currentIndex) {
+
+    // Pick a remaining element...
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex -= 1;
+
+    // And swap it with the current element.
+    temporaryValue = array[currentIndex];
+    array[currentIndex] = array[randomIndex];
+    array[randomIndex] = temporaryValue;
+  }
+
+  return array;
 }
 
 
@@ -209,18 +288,25 @@ if (navigator.getUserMedia) {
   console.log("Couldn't load webcam");
 }
 
-var i = setInterval(function(){
-  $('#container').css('opacity', 0);
-  setTimeout(function(){
-    nextImage();
-  }, 1000)
-  //$('#container').fadeOut(function(){
-    //nextImage();
-  //});
-}, 16000);
+for (var i = 0; i < signText.length; i++) {
+  var letter = $('<span>').text(signText[i]);
+  if (signText[i] == ' ') letter.addClass('space');
+  $('#sign').append(letter);
+}
 
-//var j = setInterval(function(){
-  //if (positions) {
-    //switchMasks(positions);
-  //}
-//}, 500);
+showSign();
+
+if (autoplay == true) {
+  var autoplayID = setInterval(function(){
+    $('#container').css('opacity', 0);
+    setTimeout(function(){
+      nextImage();
+    }, 3000)
+  }, 16000);
+}
+
+if (debug) {
+  $('#output, video').css({display: 'block'});
+  $('#output').css({'z-index': '999'});
+  $('video').css({'z-index': '998'});
+}
