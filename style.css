@@ -28,6 +28,7 @@ body {
 }
 
 #webgl {
+  -webkit-transform: translate3d(0, 0, 0);
   z-index: 1;
   opacity: .9;
 }
@@ -43,7 +44,9 @@ body {
   position: absolute;
   top: 0;
   left: 0;
+  -webkit-transform: translate3d(0, 0, 0);
   -webkit-transition: -webkit-transform 50.5s, opacity 4s ease;
+  -moz-transition: -moz-transform 50.5s, opacity 4s ease;
 }
 
 h1 {
@@ -69,8 +72,10 @@ h1 {
   /* -webkit-text-stroke-width: 2px; */
   display: inline-block;
   width: 80px;
+  line-height: 20px;
 }
 
-span.space {
+#sign span.space {
+  display: block;
   border: 1px solid transparent;
 }

@@ -1,7 +1,7 @@
 var signText = "COME CLOSER RUBBERNECKER";
 // var fonts = ["Arial", "monospace", "Impact", "Verdana", "Trebuchet MS"];
-var fonts = ["Arial", "Verdana", "Trebuchet MS"];
-var colors = ["#fe0687", "#a210fc", "#05e2fe", "#05e2fe", "#ff6403"];
+var fonts = ["Arial"];//, "Verdana", "Trebuchet MS"];
+var colors = ["#fe0687", "#05e2fe", "#05e2fe", "#ff6403"]; //"#210fc"
 var animateSignID;
 
 var vid = document.getElementById('videoel');
@@ -70,25 +70,7 @@ imageObj.onload = function() {
     $('h1').text(imageIndex + ': ' + images[imageIndex].name);
   }
 
-
-  if (positions) {
-    var newSaturation = '100%';
-
-    var box = boundingBox(mapping);
-    var imageStats = getImageStats(box.x, box.y, box.w, box.h, imgCanvasEl);
-
-    faceCanvas.getContext('2d').drawImage(vid, 0, 0, vid.width, vid.height);
-    box = boundingBox(positions);
-    var videoStats = getImageStats(box.x, box.y, box.w, box.h, faceCanvas);
-
-    if (imageStats.range > 0 && imageStats.range < videoStats.range) {
-      newSaturation = (100 * imageStats.range / videoStats.range) + '%';
-    }
-
-    $('#webgl').css('-webkit-filter', 'saturate('+newSaturation+') brightness('+(100 * imageStats.brightness/videoStats.brightness)+'%)');
-  } else {
-    $('#webgl').css('-webkit-filter', 'none');
-  }
+  syncColors();
 
   if (!autoplay) return true;
   $('#container').
@@ -141,7 +123,7 @@ function drawLoop() {
   positions = ctrack.getCurrentPosition();
 
   wasDrawing = shouldDraw;
-  shouldDraw = (ready === true && positions && mapping && ctrack.getScore() > .6);
+  shouldDraw = (ready === true && positions && mapping && ctrack.getScore() > .3);
 
   if (wasDrawing && !shouldDraw) {
     $('#webgl').hide();
@@ -150,6 +132,7 @@ function drawLoop() {
 
   if (!wasDrawing && shouldDraw) {
     $('#webgl').show();
+    syncColors();
     hideSign();
   }
 
@@ -212,8 +195,38 @@ function tintVideo(r, g, b) {
   ox.drawImage(buffer,0,0);
 }
 
+function syncColors() {
+  return false;
+
+  if (positions && local) {
+    var newSaturation = '100%', newBrightness = '';
+
+    var box = boundingBox(mapping);
+    var imageStats = getImageStats(box.x, box.y, box.w, box.h, imgCanvasEl);
+
+    faceCanvas.getContext('2d').drawImage(vid, 0, 0, vid.width, vid.height);
+    box = boundingBox(positions);
+    var videoStats = getImageStats(box.x, box.y, box.w, box.h, faceCanvas);
+
+    if (imageStats.range > 0 && imageStats.range < videoStats.range) {
+      newSaturation = (100 * imageStats.range / videoStats.range) + '%';
+    }
+
+    var brightnessRatio = imageStats.brightness / videoStats.brightness;
+    if (brightnessRatio < .9) brightnessRatio = .9;
+    if (brightnessRatio > 2) brightnessRatio = 2;
+
+    newBrightness = (100 * brightnessRatio) + '%';
+
+
+    $('#webgl').css('-webkit-filter', 'saturate('+newSaturation+') brightness('+newBrightness+')');
+  } else {
+    $('#webgl').css('-webkit-filter', 'none');
+  }
+}
+
 function animateSign(){
-  $('#sign span').each(function(index){
+  $('#sign').each(function(index){
     $(this).css({
       color: randomElement(colors),
       fontFamily: randomElement(fonts),
@@ -225,7 +238,7 @@ function animateSign(){
 
 function showSign() {
   $('#sign').show();
-  animateSignID = setInterval(animateSign, 300);
+  animateSignID = setInterval(animateSign, 400);
 }
 
 function hideSign() {
