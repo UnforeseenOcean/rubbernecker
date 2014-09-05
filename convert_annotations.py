@@ -16,4 +16,11 @@ with open(sys.argv[1], 'rb') as f:
             i += 2
         output.append(image)
 
-print json.dumps(output)
+print '['
+for item in output:
+    print '{'
+    print '  "name": ' + json.dumps(item['name']) + ','
+    print '  "tags": []' + ','
+    print '  "coords": ' + json.dumps(item['coords'])
+    print '},'
+print ']'

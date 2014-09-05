@@ -22,17 +22,36 @@ var imageObj = new Image();
 var imageIndex = 0, ready = false, wasDrawing = false, shouldDraw = false, local=true;
 var mapping, ctrackBG, positions, animationRequest;
 
+var adjustedBrightness = 1, adjustedSaturation = 1, adjustedHue = 1;
+var adjustedBlue = 1, adjustedRed = 1, adjustedGreen = 1;
+
 var ctrack = new clm.tracker({useWebGL : true});
 //ctrack.setResponseMode("cycle", ["lbp", "sobel"]);
 ctrack.init(pModel);
 var rgb;
 
 var autoplay = true;
-var debug = false;
+var debug = true;
+var censored = true;
 
-if (!debug) {
-  shuffle(images);
+var fd = new faceDeformer();
+fd.init(document.getElementById('webgl'));
+var wc1 = document.getElementById('webgl').getContext('webgl')
+wc1.clearColor(0,0,0,0);
+
+if (censored) {
+  for (var i = images.length - 1; i >= 0; i --) {
+    var shouldCensor = false;
+    for (var j = 0; j < images[i].tags.length; j++) {
+      if (images[i].tags[j] == 'censored') shouldCensor = true;
+    }
+    if (shouldCensor) images.splice(i, 1);
+  }
 }
+
+//if (!debug) {
+  //shuffle(images);
+//}
 
 imageObj.onload = function() {
   imageCtx.clearRect(0, 0, imgCanvasEl.width, imgCanvasEl.height);
@@ -52,16 +71,15 @@ imageObj.onload = function() {
   imgCanvasEl.width = w;
   imgCanvasEl.height = h;
 
-  if (images[imageIndex].bw == true) {
-    $('#container').css('-webkit-filter', 'grayscale(1)');
-  } else {
-    $('#container').css('-webkit-filter', 'none');
-  }
+  //if (images[imageIndex].bw == true) {
+    //$('#container').css('-webkit-filter', 'grayscale(1)');
+  //} else {
+    //$('#container').css('-webkit-filter', 'none');
+  //}
 
   imageCtx.drawImage(imageObj, 0, 0, w, h);
   ready = true;
 
-  // var coords = images[imageIndex].coords[0];
   var coords = mapping[0];
   var x = $(window).width()/2 - coords[0] * 2;
   var y = $(window).height()/2 - coords[1] * 2;
@@ -81,10 +99,6 @@ imageObj.onload = function() {
     css({opacity: 1, '-webkit-transform': 'translateX('+x+'px) translateY('+y+'px) scale(2)'});
 };
 
-var fd = new faceDeformer();
-fd.init(document.getElementById('webgl'));
-var wc1 = document.getElementById('webgl').getContext('webgl')
-wc1.clearColor(0,0,0,0);
 
 function switchImage(index) {
   ready = false;
@@ -98,6 +112,12 @@ function nextImage() {
   switchImage(imageIndex);
 }
 
+function prevImage() {
+  imageIndex --;
+  if (imageIndex < 0) imageIndex = images.length - 1;
+  switchImage(imageIndex);
+}
+
 
 function startVideo() {
   switchImage(0);
@@ -106,16 +126,7 @@ function startVideo() {
   // start tracking
   ctrack.start(vid);
   // start loop to draw face
-  //drawGridLoop();
   drawLoop();
-}
-
-function sendVidToCanvas() {
-  ox.drawImage(vid, 0, 0, vid.width, vid.height);
-  //if (rgb) {
-    //tintVideo(rgb.r, rgb.g, rgb.b);
-  //}
-  setInterval(sendVidToCanvas, 30);
 }
 
 function drawLoop() {
@@ -138,7 +149,7 @@ function drawLoop() {
 
   if (shouldDraw) {
     fd.load(vid, positions, pModel);
-    fd.draw(mapping);
+    fd.draw(mapping, adjustedBrightness, adjustedSaturation, adjustedRed, adjustedGreen, adjustedBlue);
   }
 
   if (debug && positions) {
@@ -173,34 +184,20 @@ function getImageStats(startx, starty, w, h, c) {
   rgb.b = ~~(rgb.b/count);
 
   rgb.brightness = Math.floor(colorSum / (w*h));
-  rgb.range = Math.max(rgb.r, rgb.g, rgb.b) - Math.min(rgb.r, rgb.g, rgb.b)
+  rgb.max = Math.max(rgb.r, rgb.g, rgb.b);
+  rgb.min = Math.min(rgb.r, rgb.g, rgb.b);
+  rgb.range = rgb.max - rgb.min
+
+  var hsv = rgb2hsv(rgb.r, rgb.g, rgb.b);
+  rgb.h = hsv.h;
+  rgb.s = hsv.s;
+  rgb.v = hsv.v;
 
   return rgb;
 }
 
-function tintVideo(r, g, b) {
-  // fill offscreen buffer with the tint color
-  bx.fillStyle = 'rgb(' + r + ', ' + g + ', ' + b + ')';
-  bx.fillRect(0, 0, buffer.width, buffer.height);
-
-  // destination atop makes a result with an alpha channel identical to fg, but with all pixels retaining their original color *as far as I can tell*
-  bx.globalCompositeOperation = "destination-atop";
-  bx.drawImage(vid, 0, 0);
-
-  // to tint the image, draw it first
-  ox.drawImage(vid, 0, 0);
-
-  //then set the global alpha to the amound that you want to tint it, and draw the buffer directly on top of it.
-  ox.globalAlpha = 0.2;
-  ox.drawImage(buffer,0,0);
-}
-
 function syncColors() {
-  return false;
-
   if (positions && local) {
-    var newSaturation = '100%', newBrightness = '';
-
     var box = boundingBox(mapping);
     var imageStats = getImageStats(box.x, box.y, box.w, box.h, imgCanvasEl);
 
@@ -208,20 +205,20 @@ function syncColors() {
     box = boundingBox(positions);
     var videoStats = getImageStats(box.x, box.y, box.w, box.h, faceCanvas);
 
-    if (imageStats.range > 0 && imageStats.range < videoStats.range) {
-      newSaturation = (100 * imageStats.range / videoStats.range) + '%';
+    if (imageStats.s < videoStats.s) {
+      adjustedSaturation = images[imageIndex].bw ? 0 : imageStats.s / videoStats.s;
+    } else {
+      adjustedSaturation = 1;
     }
 
     var brightnessRatio = imageStats.brightness / videoStats.brightness;
-    if (brightnessRatio < .9) brightnessRatio = .9;
-    if (brightnessRatio > 2) brightnessRatio = 2;
+    if (brightnessRatio < .7) brightnessRatio = .7;
 
-    newBrightness = (100 * brightnessRatio) + '%';
+    adjustedBrightness = brightnessRatio;
 
-
-    $('#webgl').css('-webkit-filter', 'saturate('+newSaturation+') brightness('+newBrightness+')');
-  } else {
-    $('#webgl').css('-webkit-filter', 'none');
+    adjustedRed = imageStats.r / videoStats.r;
+    adjustedGreen = imageStats.g / videoStats.g;
+    adjustedBlue = imageStats.b / videoStats.b;
   }
 }
 
@@ -284,6 +281,46 @@ function shuffle(array) {
   }
 
   return array;
+}
+
+function rgb2hsv () {
+  var rr, gg, bb,
+  r = arguments[0] / 255,
+  g = arguments[1] / 255,
+  b = arguments[2] / 255,
+  h, s,
+  v = Math.max(r, g, b),
+  diff = v - Math.min(r, g, b),
+  diffc = function(c){
+    return (v - c) / 6 / diff + 1 / 2;
+  };
+
+  if (diff == 0) {
+    h = s = 0;
+  } else {
+    s = diff / v;
+    rr = diffc(r);
+    gg = diffc(g);
+    bb = diffc(b);
+
+    if (r === v) {
+      h = bb - gg;
+    }else if (g === v) {
+      h = (1 / 3) + rr - bb;
+    }else if (b === v) {
+      h = (2 / 3) + gg - rr;
+    }
+    if (h < 0) {
+      h += 1;
+    }else if (h > 1) {
+      h -= 1;
+    }
+  }
+  return {
+    h: Math.round(h * 360),
+    s: Math.round(s * 100),
+    v: Math.round(v * 100)
+  };
 }
 
 
