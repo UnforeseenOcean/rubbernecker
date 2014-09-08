@@ -1,3 +1,11 @@
+/* Config variables */
+
+var autoplay = true;
+var debug = false;
+var censored = true;
+var shouldScreenshot = false;
+var local=true;
+
 var signText = "COME CLOSER RUBBERNECKER";
 // var fonts = ["Arial", "monospace", "Impact", "Verdana", "Trebuchet MS"];
 var fonts = ["Arial"];//, "Verdana", "Trebuchet MS"];
@@ -19,7 +27,7 @@ faceCanvas.width = vid.width;
 faceCanvas.height = vid.height;
 
 var imageObj = new Image();
-var imageIndex = 0, ready = false, wasDrawing = false, shouldDraw = false, local=true;
+var imageIndex = 0, ready = false, wasDrawing = false, shouldDraw = false;
 var mapping, ctrackBG, positions, animationRequest;
 
 var adjustedBrightness = 1, adjustedSaturation = 1, adjustedHue = 1;
@@ -30,9 +38,8 @@ var ctrack = new clm.tracker({useWebGL : true});
 ctrack.init(pModel);
 var rgb;
 
-var autoplay = true;
-var debug = true;
-var censored = true;
+var lastScreenshot = 0;
+
 
 var fd = new faceDeformer();
 fd.init(document.getElementById('webgl'));
@@ -84,6 +91,9 @@ imageObj.onload = function() {
   var x = $(window).width()/2 - coords[0] * 2;
   var y = $(window).height()/2 - coords[1] * 2;
 
+  var mozx = $(window).width()/2 - coords[0];
+  var mozy = $(window).height()/2 - coords[1];
+
   if (debug) {
     $('h1').text(imageIndex + ': ' + images[imageIndex].name);
   }
@@ -93,10 +103,14 @@ imageObj.onload = function() {
   if (!autoplay) return true;
   $('#container').
     addClass('notransition').
-    css('-webkit-transform', 'none')[0].offsetHeight
+    css({'-moz-transform': 'none', '-webkit-transform': 'none'})[0].offsetHeight
   $('#container').
     removeClass('notransition').
-    css({opacity: 1, '-webkit-transform': 'translateX('+x+'px) translateY('+y+'px) scale(2)'});
+    css({
+      opacity: 1,
+      '-webkit-transform': 'translateX('+x+'px) translateY('+y+'px) scale(2)',
+      '-moz-transform': 'translateX('+mozx+'px) translateY('+mozy+'px)'
+    });
 };
 
 
@@ -283,6 +297,12 @@ function shuffle(array) {
   return array;
 }
 
+function saveScreenshot() {
+  lastScreenshot = new Date().getTime();
+  console.log('saving');
+  $.get('http://localhost:3000/screenshot');
+}
+
 function rgb2hsv () {
   var rr, gg, bb,
   r = arguments[0] / 255,
@@ -348,6 +368,9 @@ showSign();
 
 if (autoplay == true) {
   var autoplayID = setInterval(function(){
+    if (shouldScreenshot && ctrack.getScore() > .7) {// && new Date().getTime() - lastScreenshot > 5000) {
+      saveScreenshot();
+    }
     $('#container').css('opacity', 0);
     setTimeout(function(){
       nextImage();
